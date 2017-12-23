@@ -28,7 +28,7 @@ class BaxterCtrls():
 
         # Home position definitions - Determined by moving Baxter to safe positions
         self.hdr = Header
-        self.arm_poses = {
+        self.home_arm_poses = {
             'left': Pose(
                 position = Point(
                     x = 0.76053,
@@ -61,7 +61,7 @@ class BaxterCtrls():
     def enable_baxter(self):
 
         # Print Info message detailing that Baxter is now enabled (unless there are other issues)
-        rospy.loginfo("Issuing 'Enable' command to Baxter.")
+        rospy.loginfo("INIT - Issuing 'Enable' command to Baxter.")
 
         # Issue enabling command to Baxter
         # Kick out error message if an exception is encountered
@@ -76,7 +76,7 @@ class BaxterCtrls():
     def disable_baxter(self):
 
         # Print Info message detailing that Baxter is now disabled
-        rospy.loginfo("Issuing 'Disable' command to Baxter.")
+        rospy.loginfo("INIT - Issuing 'Disable' command to Baxter.")
 
         # Issue disabling command to Baxter
         # Kick out error message if an exception is encountered
@@ -91,8 +91,8 @@ class BaxterCtrls():
     def calibrate_grippers(self):
 
         # Loop through available grippers and calibrate each
-        for side in ['left']: #'right'
-            rospy.loginfo("Calibrating " + side + " gripper.")
+        for side in ['left', 'right']:
+            rospy.loginfo("INIT - Calibrating " + side + " gripper.")
             side = baxter_interface.Gripper(side)
             side.calibrate()
 
@@ -134,7 +134,7 @@ class BaxterCtrls():
         # Assemble pose request based on "limb" argument passed to function
         self.pose_requested = PoseStamped(
             header = self.hdr,
-            pose = self.arm_poses[limb]
+            pose = self.home_arm_poses[limb]
         )
 
         ikreq.pose_stamp.append(self.pose_requested)
@@ -167,5 +167,11 @@ class BaxterCtrls():
                 pass
         else:
             rospy.loginfo("IK SOLVER - Invalid pose - No valid joint solution found.")
+
+        return
+
+    def set_display_image(self, imagePath):
+
+        # PLACEHOLDER FOR NOW
 
         return

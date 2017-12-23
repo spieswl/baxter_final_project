@@ -1,18 +1,16 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>me495_baxter_jar</name>
-  <version>1.0.0</version>
-  <description>The me495_baxter_jar package</description>
+  <name>container-manipulator_baxter</name>
+  <version>0.0.1</version>
+  <description>This package is designed to work with Rethink Robotics' Baxter platform, and implements controls designed to grasp and manipulate the lids of common household containers.
 
-  <maintainer email="ahalaya@todo.todo">wspies</maintainer>
-  <maintainer email="mike@todo.todo">wspies</maintainer>
-  <maintainer email="ola@todo.todo">wspies</maintainer>
-  <maintainer email="ruby@todo.todo">wspies</maintainer>
+  This project is a fork of the me495_baxter_jar project.</description>
+
   <maintainer email="WilliamSpies2018@u.northwestern.edu">wspies</maintainer>
 
   <license>TBD</license>
 
-  <url type="website">https://github.com/am2512/baxter_final_project</url>
+  <url type="website">https://github.com/spieswl/container-manipulator_baxter</url>
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>

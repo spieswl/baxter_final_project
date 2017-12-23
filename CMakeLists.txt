@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(me495_baxter_jar)
+project(container-manipulator_baxter)
 
 find_package(catkin REQUIRED COMPONENTS
   message_generation
