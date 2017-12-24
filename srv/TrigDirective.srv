@@ -1,0 +1,5 @@
+string side                 # String literal specifying the "side" of the robot that will perform the function
+string directive            # String literal containing a functional directive, e.g. designates the direction in which to perform the triggered action with, etc.
+---
+bool success                # Indicate successful run of triggered service
+string message              # Informational, e.g. for error messages

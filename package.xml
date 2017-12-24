@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <package format="2">
-  <name>container-manipulator_baxter</name>
+  <name>container_manipulator</name>
   <version>0.0.1</version>
   <description>This package is designed to work with Rethink Robotics' Baxter platform, and implements controls designed to grasp and manipulate the lids of common household containers.
 
@@ -10,7 +10,7 @@
 
   <license>TBD</license>
 
-  <url type="website">https://github.com/spieswl/container-manipulator_baxter</url>
+  <url type="website">https://github.com/spieswl/container_manipulator</url>
 
   <buildtool_depend>catkin</buildtool_depend>
   <depend>rospy</depend>

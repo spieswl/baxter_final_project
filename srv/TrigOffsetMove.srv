@@ -1,3 +1,4 @@
+string side                 # String literal containing either "left" or "right", designates the arm to perform the triggered action with
 geometry_msgs/Pose offset   # Desired offset position for the motion controller to adjust the current EE position by
 ---
 bool success                # Indicate successful run of triggered service

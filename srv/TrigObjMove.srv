@@ -1,0 +1,5 @@
+string side                 # String literal containing either "left" or "right", designates the arm to perform the triggered action with
+uint8 object_id             # ID number for the desired object to moving to
+---
+bool success                # Indicate successful run of triggered service
+string message              # Informational, e.g. for error messages

@@ -15,7 +15,7 @@ class poseHandler():
 
         # Publishers and Subscribers
         rospy.Subscriber('ar_pose_marker', AlvarMarkers, self.cb_register_obj_pose)
-        self.object_pose = rospy.Publisher('object_pose', Pose, queue_size = 1)
+        self.object_pose = rospy.Publisher('object_poses', AlvarMarker, queue_size = 1)
 
         # Service Definitions
         self.update_obj_pose = rospy.Service('pose_relay/update_obj_pose', Trigger, self.svc_update_published_pose)
@@ -56,7 +56,7 @@ class poseHandler():
             self.static_obj_pose = []
 
             for index in range(len(self.last_obj_pose)):
-                self.static_obj_pose.append(self.last_obj_pose[index].pose.pose)
+                self.static_obj_pose.append(self.last_obj_pose[index])
 
             return (True, "POSE HANDLER - Update Complete.")
 

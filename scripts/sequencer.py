@@ -7,7 +7,7 @@ import _init_baxter
 
 from geometry_msgs.msg import (Point, Pose, PoseStamped, Quaternion)
 
-from me495_baxter_jar.srv import OffsetMove
+from container_manipulator.srv import (TrigDirective, TrigObjMove, TrigOffsetMove)
 from std_srvs.srv import Trigger
 
 

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(container-manipulator_baxter)
+project(container_manipulator)
 
 find_package(catkin REQUIRED COMPONENTS
   message_generation
@@ -13,7 +13,9 @@ find_package(catkin REQUIRED COMPONENTS
 
 add_service_files(
   FILES
-  OffsetMove.srv
+  TrigObjMove.srv
+  TrigOffsetMove.srv
+  TrigString.srv
 )
 
 generate_messages(

@@ -6,12 +6,13 @@ import baxter_interface
 import math
 import tf
 
+from ar_track_alvar_msgs.msg import AlvarMarker
 from baxter_core_msgs.msg import EndpointState
 from geometry_msgs.msg import (Point, Pose, PoseStamped, Quaternion)
 from std_msgs.msg import Header
 
 from baxter_core_msgs.srv import (SolvePositionIK, SolvePositionIKRequest)
-from me495_baxter_jar.srv import OffsetMove
+from container_manipulator.srv import (TrigDirective, TrigObjMove, TrigOffsetMove)
 from std_srvs.srv import Trigger
 
 
@@ -20,43 +21,34 @@ class motionControls():
     def __init__(self):
 
         # Publishers and Subscribers
-        rospy.Subscriber('/robot/limb/left/endpoint_state', EndpointState, self.cb_set_left_ee_position)
-        rospy.Subscriber('/robot/limb/right/endpoint_state', EndpointState, self.cb_set_right_ee_position)
-        rospy.Subscriber('object_pose', Pose, self.cb_set_tag_position)
+        rospy.Subscriber('/robot/limb/left/endpoint_state', EndpointState, self.cb_update_lhand_position)
+        rospy.Subscriber('/robot/limb/right/endpoint_state', EndpointState, self.cb_update_rhand_position)
+        rospy.Subscriber('object_poses', AlvarMarker, self.cb_set_obj_positions) # TODO: MAY NEED TO BE CHANGED TO NEW MSG TYPE
+
+        # Baxter interface components
+        self.left_arm = baxter_interface.Limb('left')
+        self.left_wrist = self.left_arm.joint_names()[6]
+        self.right_arm = baxter_interface.Limb('right')
+        self.right_wrist = self.right_arm.joint_names()[6]
 
         # Service Definitions
-        rospy.Service('motion_controller/store_bottle_pose', Trigger, self.svc_store_bottle_pose)
-        rospy.Service('motion_controller/move_to_AR_tag', Trigger, self.svc_move_to_AR_tag)
-        rospy.Service('motion_controller/move_to_offset', OffsetMove, self.svc_move_to_offset)
-        rospy.Service('motion_controller/move_to_bottle', Trigger, self.svc_move_to_bottle)
+        rospy.Service('motion_controller/store_object_poses', Trigger, self.svc_store_object_poses)
+        rospy.Service('motion_controller/move_to_object', TrigObjMove, self.svc_move_to_object)
+        rospy.Service('motion_controller/move_to_offset', TrigOffsetMove, self.svc_move_to_offset)
+        rospy.Service('motion_controller/twist_wrist', TrigDirective, self.svc_twist_wrist)
 
-        # Static configuration variables
-        self.limb = 'left'      # Hardcoded for now
+        # Local 'object' pose data containers & end-effector positions
+        self.lid_pose = Pose()
+        self.bottle_pose = Pose()
+        self.table_pose = Pose()
 
-        # Class variables for later use
-        self.tag = Pose()
-        self.bottle = Pose()
-
-        self.bottle_x = 0
-        self.bottle_y = 0
-        self.bottle_z = 0
-
-        self.bottle_qx = 0
-        self.bottle_qy = 0
-        self.bottle_qz = 0
-        self.bottle_qw = 0
+        self.left_ee_point = Point()
+        self.left_ee_orientation = Quaternion()
+        self.right_ee_point = Point()
+        self.right_ee_orientation = Quaternion()
 
 
-    def cb_set_tag_position(self, data):
-        '''
-        Cache new pose values that are obtained from the detected object's AR tag.
-        '''
-        self.tag = data
-
-        return
-
-
-    def cb_set_left_ee_position(self, data):
+    def cb_update_lhand_position(self, data):
         '''
         Cache pose information for Baxter's left end effector. Useful for offset moves based on current position.
         '''
@@ -67,7 +59,7 @@ class motionControls():
         return
 
 
-    def cb_set_right_ee_position(self, data):
+    def cb_update_rhand_position(self, data):
         '''
         Cache pose information for Baxter's right end effector. Useful for offset moves based on current position.
         '''
@@ -77,11 +69,52 @@ class motionControls():
 
         return
 
+# TODO
 
-    def svc_move_to_AR_tag(self, data):
+    def cb_set_obj_positions(self, data): # TODO: REVIEW THIS FUNCTION'S OPERATION
+        '''
+        Cache new pose values that are obtained from the detected object's AR tag, centroid position, or other data source.
+        '''
+
+        # Check the ID value for each object presented, update the related pose container
+        if (data.id == 0):
+            self.lid_pose = data.pose.pose
+        elif (data.id == 5):
+            self.bottle_pose = data.pose.pose
+        elif (data.id == 8):
+            self.table_pose = data.pose.pose
+
+        return
+
+
+    def svc_store_object_poses(self, data): # TODO: CLEAN UP THIS FUNCTION
+        '''
+        This service will copy the last stored AR tag value and cache it for some other purpose. This sequence assumes
+        that the tag for the lid (while ON the bottle) is read, allowing for this function to store a location for where
+        we assume the bottle to be.
+        '''
+
+        # Correct the orientation for the bottle from the cached marker orientation
+        bottle_q_old = [self.lid_pose.orientation.x, self.lid_pose.orientation.y, self.lid_pose.orientation.z, self.lid_pose.orientation.w]
+        bottle_q_rot = tf.transformations.quaternion_from_euler(0, math.pi, 0)
+        bottle_q_new = tf.transformations.quaternion_multiply(bottle_q_rot, bottle_q_old)
+
+        self.bottle_pose.position = self.lid_pose.position
+
+        self.bottle_pose.orientation = Quaternion(
+            x = bottle_q_new[0],
+            y = bottle_q_new[1],
+            z = bottle_q_new[2],
+            w = bottle_q_new[3]
+        )
+
+        return (True, "MOTION CTRL - Bottle location cached.")
+
+
+    def svc_move_to_object(self, data): # TODO: CLEAN UP THIS FUNCTION
         '''
         This service function takes the cached pose information for the lid's AR marker, calls for an IK solution that
-        drings the designated end effector into alignment with the lid, and executes a move to the calculated joint
+        brings the designated end effector into alignment with the lid, and executes a move to the calculated joint
         positions.
         '''
 
@@ -94,15 +127,15 @@ class motionControls():
         hdr = Header(stamp = rospy.Time.now(), frame_id = 'base')
 
         # Update orientation of gripper based on rotation of AR tag frame to a frame compatible with Baxter's EE state
-        tag_q_old = [self.tag.orientation.x, self.tag.orientation.y, self.tag.orientation.z, self.tag.orientation.w]
+        tag_q_old = [self.lid_pose.orientation.x, self.lid_pose.orientation.y, self.lid_pose.orientation.z, self.lid_pose.orientation.w]
         tag_q_rot = tf.transformations.quaternion_from_euler(0, math.pi, 0)
         tag_q_new = tf.transformations.quaternion_multiply(tag_q_rot, tag_q_old)
 
         # Locally relevant AR tag derived poses (typ. for marker, bottle, or table)
-        AR_pose = PoseStamped(
+        AR_coords = PoseStamped(
             header = hdr,
             pose = Pose(
-                position = self.tag.position,
+                position = self.lid_pose.position,
                 orientation = Quaternion(
                     x = tag_q_new[0],
                     y = tag_q_new[1],
@@ -113,7 +146,7 @@ class motionControls():
         )
 
         # Set the desired pose in the service request message to pose information pulled from the object pose topic
-        ikreq.pose_stamp.append(AR_pose)
+        ikreq.pose_stamp.append(AR_coords)
 
         try:
             rospy.wait_for_service(ns, 5.0)
@@ -143,31 +176,7 @@ class motionControls():
             return (False, "MOTION CTRL - Motion planner failure.")
 
 
-    def svc_store_bottle_pose(self,data):
-        '''
-        This service will copy the last stored AR tag value and cache it for some other purpose. This sequence assumes
-        that the tag for the lid (while ON the bottle) is read, allowing for this function to store a location for where
-        we assume the bottle to be.
-        '''
-
-        # Correct the orientation for the bottle from the cached marker orientation
-        bottle_q_old = [self.tag.orientation.x, self.tag.orientation.y, self.tag.orientation.z, self.tag.orientation.w]
-        bottle_q_rot = tf.transformations.quaternion_from_euler(0, math.pi, 0)
-        bottle_q_new = tf.transformations.quaternion_multiply(bottle_q_rot, bottle_q_old)
-
-        self.bottle.position = self.tag.position
-
-        self.bottle.orientation = Quaternion(
-            x = bottle_q_new[0],
-            y = bottle_q_new[1],
-            z = bottle_q_new[2],
-            w = bottle_q_new[3]
-        )
-
-        return (True, "MOTION CTRL - Bottle location cached.")
-
-
-    def svc_move_to_bottle(self, data):
+    def svc_move_to_bottle(self, data): # TODO: REMOVE THIS FUNCTION
         '''
         This service function takes the cached pose information for the bottle, based on the original AR marker's pose,
         calls for an IK solution that brings the designated end effector into position, and executes a move to the
@@ -182,17 +191,17 @@ class motionControls():
         # Update header information based on current time and with reference to base frame
         hdr = Header(stamp = rospy.Time.now(), frame_id = 'base')
 
-        bottle_pose = PoseStamped(
+        bottle_coords = PoseStamped(
             header = hdr,
             pose = Pose(
-                position = self.bottle.position,
-                orientation = self.bottle.orientation
+                position = self.bottle_pose.position,
+                orientation = self.bottle_pose.orientation
             )
         )
 
 
         # Set the desired pose in the service request message to pose information pulled from the object pose topic
-        ikreq.pose_stamp.append(bottle_pose)
+        ikreq.pose_stamp.append(bottle_coords)
 
         try:
             rospy.wait_for_service(ns, 5.0)
@@ -223,7 +232,7 @@ class motionControls():
 
 
 
-    def svc_move_to_offset(self, data):
+    def svc_move_to_offset(self, data): # TODO: CLEAN UP THIS FUNCTION
         '''
         This service function takes pose information from data contained in a service request passed from the main
         sequencer and generates a new desired end-effector pose. That pose is sent as the target pose for the purpose
@@ -231,7 +240,7 @@ class motionControls():
         '''
 
         # Establish connection to specific limb's IKSolver service
-        ns = '/ExternalTools/' + self.limb + '/PositionKinematicsNode/IKService'
+        ns = '/ExternalTools/' + data.side + '/PositionKinematicsNode/IKService'
         iksvc = rospy.ServiceProxy(ns, SolvePositionIK)
         ikreq = SolvePositionIKRequest()
 
@@ -277,7 +286,7 @@ class motionControls():
                          'right': right_offset }
 
         # Set the desired pose in the service request message to pose information pulled from the object pose topic
-        ikreq.pose_stamp.append(offset_poses[self.limb])
+        ikreq.pose_stamp.append(offset_poses[data.side])
 
         try:
             rospy.wait_for_service(ns, 5.0)
@@ -293,18 +302,34 @@ class motionControls():
             limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
 
             # Print Info message to alert users of impending motion
-            rospy.loginfo("MOTION CTRL - WARNING! Moving Baxter's " + self.limb + " arm to offset position.")
+            rospy.loginfo("MOTION CTRL - WARNING! Moving Baxter's " + data.side + " arm to offset position.")
 
-            if (self.limb == 'left'):
-                left = baxter_interface.Limb('left')
-                left.move_to_joint_positions(limb_joints)
-            elif (self.limb == 'right'):
-                right = baxter_interface.Limb('right')
-                right.move_to_joint_positions(limb_joints)
+            arm = baxter_interface.Limb(data.side)
+            arm.move_to_joint_positions(limb_joints)
 
             return (True, "MOTION CTRL - Move to offset position complete.")
         else:
             return (False, "MOTION CTRL - Motion planner failure.")
+
+
+    def svc_twist_wrist(self, data): # TODO: FINISH THIS FUNCTION
+
+        if (data.side == 'left'):
+
+            if (data.directive == 'CCW'):
+
+            # DO SOMETHING
+            self.left_arm.move_to_joint_positions({self.left_wrist: 3})
+
+        elif (data.side == 'right'):
+
+            # DO SOMETHING
+            self.right_arm.move_to_joint_positions({self.right_wrist: 3})
+
+        else:
+            return (False, "MOTION CTRL - Please specify either 'left' or 'right' when triggering this action.")
+
+# END TODO
 
 # ========== #
 
@@ -327,4 +352,5 @@ if __name__ == '__main__':
     try:
         main()
     except rospy.ROSInterruptException:
+        rospy.loginfo("MOTION CTRL - Shutting down motion controller node.")
         pass

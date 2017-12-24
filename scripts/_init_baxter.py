@@ -31,28 +31,28 @@ class BaxterCtrls():
         self.home_arm_poses = {
             'left': Pose(
                 position = Point(
-                    x = 0.76053,
-                    y = 0.30539,
-                    z = 0.27095
+                    x = 0.7605,
+                    y = 0.3054,
+                    z = 0.2710
                 ),
                 orientation = Quaternion(
-                    x = 0.01397,
-                    y = 0.99479,
-                    z = -0.05797,
-                    w = 0.08265
+                    x = 0.0140,
+                    y = 0.9948,
+                    z = -0.0580,
+                    w = 0.0826
                 )
             ),
             'right': Pose(
                 position = Point(
-                    x = 0.52721,
-                    y = -0.86806,
-                    z = -0.09085
+                    x = 0.5272,
+                    y = -0.8680,
+                    z = -0.0908
                 ),
                 orientation = Quaternion(
-                    x = 0.31333,
-                    y = 0.94930,
-                    z = 0.00165,
-                    w = 0.02574
+                    x = 0.3133,
+                    y = 0.9493,
+                    z = 0.0016,
+                    w = 0.0257
                 )
             )
         }
